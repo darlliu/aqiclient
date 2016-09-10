@@ -112,11 +112,24 @@ class Instrument(object):
     def __str__(self):
         return self.__unicode__().encode("utf-8")
 
-    def orderShort(self, units):
+    def orderSell(self, units):
         pass
 
-    def orderLong(self, units):
+    def orderBuy(self, units):
         pass
+
+class SimulatedInstrument(Instrument):
+
+    def __init__(self,name, sym,itype=None, acct=None):
+        super(SimulatedInstrument,self).__init__(-1,itype,acct)
+        self.name=name
+        self.symbol=sym
+
+    def update(self,ts, price):
+        self.data["price"]=price
+        self.ts=pd.Timestamp(ts)
+        self.prices = self.prices.append(pd.Series(self.price, [self.ts]))
+        return
 
 def GetAllInstruments(acct=None):
     res= CONN.action("/api/instruments")
@@ -171,7 +184,7 @@ class Portfolio(object):
 
     def __unicode__(self):
         return u"[{id}][active:{active}][{date}] {name}: {price} @ {time}, {low}~{high}".format(type=self.type,
-                id=self.id, active=self.active, name=self.name, date=self.createDate, price=self.data.get("value",float("nan"))
+                id=self.id, active=self.active, name=self.name, date=self.createDate, price=self.data.get("value",float("nan")),
                 time=self.ts, low=self.data.get("stopLoss",float('nan')),high=self.data.get("stopWin",float('nan')))
 
     def __str__(self):
@@ -195,13 +208,158 @@ class Strategy(object):
     A strategy takes in a portfolio and manipulates it according to some internal login
     and external information
     """
-    pass
+
+    def __init__(self,name, portfolio):
+        self.name = name
+        self.pro = portfolio
+        return
+
+    def init(self,**kwargs):
+        """
+        A method to initialize the strategy
+        """
+        return
+
+    def update(self, **kwargs):
+        """
+        A method to iterate through the strategy
+        A strategy can hold/wait, do nothing or perform some operations based on
+        some internal states
+        """
+        return
+
+
+class ThresholdTurningPointSubroutine(object):
+    def __init__(self, id, opt,pt, h, direction=1):
+        self.id=id
+        self.pt=pt
+        self.opt=pt
+        self.h=h
+        self.direction=direction
+        self.terminated=False
+        self.cleared=False
+        print "created subroutine {} at direction {}".format(id, direction)
+
+    def update(self,p):
+        if direction and p < self.pt:
+            print """if longing and price dropped too low"""
+            self.terminated=True
+            return
+        elif not direction and p>self.pt:
+            print """shorting and price too high"""
+            self.terminated=True
+            return
+        if direction:
+            if self.opt-p>=self.h:
+                print "Subroutine (sell) {} cleared at price {}, delta {}, margin {}".format(id, p,opt-p, p-self.pt)
+                self.cleared=True
+                return
+        else:
+            if p-self.opt >=self.h:
+                print "Subroutine (buy) {} cleared at price {}, delta {}, margin {}".format(id, p,opt-p, p-self.pt)
+                self.cleared=True
+                return
+
+
+class ThresholdTurningPoint(Strategy):
+    """
+    A test
+    """
+    def __init__(self,name, portfolio, inst, funds, simulated=False):
+        super(ThresholdTurningPoint,self).__init__(name, portfolio)
+        self.sim=simulated
+        self.params={}
+        self.inst=inst
+        self.min=None
+        self.max=None
+        self.funds=funds
+
+    def init(self,n,h, units, nmode="fixed",hmode="abs",**kwargs):
+        self.stacks=[]
+        self.pt=self.inst.price
+        if self.pt*units > funds:
+            raise ValueError("Not enough funds!")
+        self.funds -= units*self.pt
+        self.units = units
+        self.n=n
+        self.h=h
+        self.hmode=hmode
+        self.nmode=nmode
+        self.cnt=0
+        self.direction=0
+        for key, val in kwargs.items():
+            self.params[key]=val
+        return
+
+    def placeUnits(self, u,p,thr1=0, thr2=0, direction=1):
+        if direction: #long
+            if (self.units - u)*p+funds<thr1:
+                print "Running out of funds!"
+                return False
+            else:
+                self.units -= u
+                return True
+        else:
+            if funds-u*p < thr2:
+                print "Running out of funds!"
+                return False
+            else:
+                self.units += u
+                return True
+        return False
+
+    def update(self,**kwargs):
+        def clearStacks(stacks):
+            for s2 in self.stacks:
+                s2.update(p_cur)
+                if s2.cleared:
+                    print "{} cleared at price {}".format(s2.id, p_cur)
+                    n=self.n #may change
+                    if self.placeUnits(n):
+                        if s2.direction:
+                            self.inst.orderSell(n)
+                        else:
+                            self.inst.orderBuy(n)
+                    else:
+                        print "Failed to place order for {} at price {} for unit {}".format(s2.id, p_cur, n)
+                elif s2.terminated:
+                    print "{} terminated at price {}".format(s2.id, p_cur)
+                else:
+                    stacks.append(s)
+            return stacks
+        stacks = []
+        p_old=self.inst.price
+        self.inst.update()
+        p_cur=self.inst.price
+        if p_cur==p_old:
+            print "No change..."
+            return
+        stacks=clearStacks(stacks)
+        if p_cur>p_old:
+            direction = 1
+        else:
+            direction = -1
+        if self.direction != direction:
+            self.direction=direction
+            if p_cur>p_old:
+                s = ThresholdTurningPointSubroutine(cnt, p_old, self.pt, self.h, -1)
+            else:
+                s = ThresholdTurningPointSubroutine(cnt, p_old, self.pt, self.h, 1)
+            s.update(p_cur)
+            stacks.append(s)
+        self.stacks =stacks
+        return
+    def clearOrders(self,**kwargs):
+        #need to clear order and recalculate unit/funds here
+        return
 
 if __name__ == "__main__":
 
+    print CONN.action("/api/user/accounts")
     print CONN.action("/api/user")
-    print CONN.action("/api/portfolio?portfolioID=3")
-    print CONN.action("/api/portfolio/position?portfolioID=3")
+    print CONN.action("/api/portfolio?portfolioID=23")
+    # print CONN.action("/api/portfolio/position?portfolioID=23")
+    INST=SimulatedInstrument("Apple","APPL","stock")
     for inst in GetAllInstruments(None):
         inst.update()
         print inst
