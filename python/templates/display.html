@@ -1,0 +1,114 @@
+
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8">
+        <meta http-equiv="X-UA-Compatible" content="IE=edge">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="description" content="">
+        <meta name="author" content="">
+        <link rel="icon" href="../../favicon.ico">
+
+        <title>AqiClient Simulator</title>
+
+        <!-- Bootstrap core CSS -->
+        <link href="/static/bootstrap/css/bootstrap.min.css" rel="stylesheet">
+        <script src="http://d3js.org/d3.v3.js"></script>
+        <link href="/static/dashboard.css" rel="stylesheet">
+
+        <!-- Just for debugging purposes. Don't actually copy these 2 lines! -->
+        <!--[if lt IE 9]><script src="../../assets/js/ie8-responsive-file-warning.js"></script><![endif]-->
+        <!--Check on this later-->
+        <!--     // <script src="/static/js/ie-emulation-modes-warning.js"></script> -->
+
+        <!-- HTML5 shim and Respond.js for IE8 support of HTML5 elements and media queries -->
+        <!--[if lt IE 9]>
+            <script src="https://oss.maxcdn.com/html5shiv/3.7.2/html5shiv.min.js"></script>
+            <script src="https://oss.maxcdn.com/respond/1.4.2/respond.min.js"></script>
+        <![endif]-->
+    </head>
+
+    <body>
+
+        <div class="container-fluid">
+            <div class="row">
+                <div class="col-md-2">
+                    <h5>Threshold Turning Point Parameters Input</h5>
+                    <p></p>
+                    <form id="params">
+                    <ul class="list-group">
+                        <li class="list-group-item"><select name="stock">
+                            <option value="apple">Apple(Historical)</option>
+                            <option value="twitter">Twitter(Historical)</option>
+                        </select></li>
+                        <li class="list-group-item">n:<input type="number" name="n" id="param_n" placeholder="Increment of buy/sell amounts" value=20></li>
+                        <li class="list-group-item">h:<input type="number" name="h" id="param_h" placeholder="Threshold for price difference" value=1></li>
+                        <li class="list-group-item">start:<input type="number" name="start_year" id="param_year_start" placeholder="Increment of buy/sell amounts" value=2014></li>
+                        <li class="list-group-item">end:<input type="number" name="end_year" id="param_year_end" placeholder="Increment of buy/sell amounts" value=2016></li>
+                        <li class="list-group-item">funds:<input type="number" name="funds" id="param_funds" placeholder="Initial funds" value=100000></li>
+                        <li class="list-group-item">units<input type="number" name="units" id="param_units" placeholder="Initial holding of stock units" value=100></li>
+                    </ul>
+                    <button type="button" class="btn btn-submit"><input type="submit" value="Run simulation"></button>
+                    </form>
+                </div>
+
+                <div class="col-md-10">
+                    <div class="container-fluid">
+                    <div class="row-fluid" id="chart_div">
+                    </div>
+
+                    <div class="row-fluid" id="chart_div2">
+                    </div>
+
+                    <div class="row-fluid" id="chart_diff_div">
+                    </div>
+
+                    <div class="row-fluid" id="table_div">
+                    </div>
+                    </div>
+                </div>
+            </div>
+        </div><!-- /.container -->
+
+
+        <!-- Bootstrap core JavaScript
+            ================================================== -->
+            <!-- Placed at the end of the document so the pages load faster -->
+            <script type="text/javascript" src="https://www.gstatic.com/charts/loader.js"></script>
+            <script src="http://code.jquery.com/jquery-latest.min.js"></script>
+            <script src="/static/bootstrap/js/bootstrap.min.js"></script>
+            <!-- IE10 viewport hack for Surface/desktop Windows 8 bug -->
+            <!--     // <script src="/static/assets/js/ie10-viewport-bug-workaround.js"></script> -->
+            <script>
+                    // Load the Visualization API and the piechart package.
+                    google.charts.load('current', {'packages':['corechart','table']});
+                    // Set a callback to run when the Google Visualization API is loaded.
+                    function drawChart(e) {
+                      var jsonData = $.ajax({
+                            type: "POST",
+                            dataType:'json',
+                            async:false,
+                            url: "/data",
+                            data: $(this).serialize(),
+                            }).responseText;
+                      jsonData=JSON.parse(jsonData);
+                      e.preventDefault();
+                      // Create our data table out of JSON data loaded from server.
+                      var data = new google.visualization.DataTable(jsonData["chart"]);
+                      // Instantiate and draw our chart, passing in some options.
+                      var chart = new google.visualization.LineChart(document.getElementById('chart_div'));
+                      chart.draw(data,{"height":1200,"width":1800});
+
+                      var data2 = new google.visualization.DataTable(jsonData["chart2"]);
+                      // Instantiate and draw our chart, passing in some options.
+                      var chart2 = new google.visualization.LineChart(document.getElementById('chart_div2'));
+                      chart2.draw(data2,{"height":1200,"width":1800});
+                      var data3 = new google.visualization.DataTable(jsonData["table"]);
+                      var table = new google.visualization.Table(document.getElementById('table_div'));
+                      table.draw(data3);
+                    }
+                    $("#params").on("submit",drawChart);
+            </script>
+
+    </body>
+</html>

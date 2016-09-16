@@ -5,6 +5,12 @@ import httplib
 import json
 import pandas as pd
 import numpy as np
+import logging
+logger = logging.getLogger("REST Client")
+logger.setLevel(logging.INFO)
+ch=logging.StreamHandler()
+ch.setLevel(logging.INFO)
+logger.addHandler(ch)
 class RESTConnection(object):
     def __init__ (self, usr="charles", pwd="123", host="54.245.103.8"):
         self.usr = usr
@@ -20,10 +26,10 @@ class RESTConnection(object):
         req = self.h.request("POST","/api/login", self.params, self.headers)
         res = self.h.getresponse()
         if res.status == 200:
-            print "Connected"
+            logger.debug("Connected")
             return res.read()
         else:
-            print "ERR: {}".format(res.status)
+            logger.warning("ERR: {}".format(res.status))
             return None
     def action(conn, url, action="GET",**kwargs):
         params = json.dumps(kwargs)
@@ -41,13 +47,13 @@ class RESTConnection(object):
         try:
             res= inner()
         except:
-            print "Trying to refresh"
+            logger.debug("Trying to refresh")
             conn.refresh()
             res = inner()
         if res.status == 200:
             return res.read()
         else:
-            print "ERR:{} {}".format(res.status, res.reason)
+            logger.info("ERR:{} {}".format(res.status, res.reason))
             return None
 
 CONN=RESTConnection()
@@ -81,7 +87,7 @@ class Instrument(object):
         """
         res = CONN.action("/api/instruments?id={}".format(self.id))
         if not res:
-            print "INSTRUMENT: UPDATE FAILED {}".format(res)
+            logger.info( "INSTRUMENT: UPDATE FAILED {}".format(res))
         self.current_raw=json.loads(res)[0]
         self.symbol=self.current_raw.get("symbol",None)
         self.name=self.current_raw.get("name",None)
@@ -96,7 +102,7 @@ class Instrument(object):
 
     def updateHolding(self):
         if self.acct == None:
-            print "No account found"
+            logger.info("No account found")
             return 0
         return 0
 
@@ -171,7 +177,7 @@ class Portfolio(object):
         """
         res = CONN.action("/api/portfolio?id={}".format(self.id))
         if not res:
-            print "PORTFOLIO: UPDATE FAILED {}".format(res)
+            logger.info("PORTFOLIO: UPDATE FAILED {}".format(res))
         self.current_raw=json.loads(res)[0]
         self.name=self.current_raw.get("name",None)
         self.active=self.current_raw.get("active","false")
@@ -201,7 +207,8 @@ class Order(object):
     """
     An order is placed by an instrument to long or short it
     """
-    pass
+    def __init__(self,**kwargs):
+        return
 
 class Strategy(object):
     """
@@ -230,35 +237,47 @@ class Strategy(object):
 
 
 class ThresholdTurningPointSubroutine(object):
-    def __init__(self, id, opt,pt, h, direction=1):
-        self.id=id
+    def __init__(self, sid, opt,pt, h, t, direction=1):
+        self.sid=sid
+        self.t=t
+        self.tend=t
         self.pt=pt
-        self.opt=pt
+        self.opt=opt
+        self.pend=pt
         self.h=h
         self.direction=direction
         self.terminated=False
         self.cleared=False
-        print "created subroutine {} at direction {}".format(id, direction)
+        logger.debug("created subroutine {} at direction {}, price is {}".format(self.sid, direction,self.opt))
 
-    def update(self,p):
-        if direction and p < self.pt:
-            print """if longing and price dropped too low"""
+    def update(self,p,t):
+        if self.direction==1 and p < self.pt:
+            logger.debug("""if longing and price dropped too low""")
+            self.tend=t
+            self.pend=p
             self.terminated=True
             return
-        elif not direction and p>self.pt:
-            print """shorting and price too high"""
+        elif self.direction==-1 and p>self.pt:
+            logger.debug("""shorting and price too high""")
+            self.tend=t
+            self.pend=p
             self.terminated=True
             return
-        if direction:
+        if self.direction==1:
             if self.opt-p>=self.h:
-                print "Subroutine (sell) {} cleared at price {}, delta {}, margin {}".format(id, p,opt-p, p-self.pt)
+                logger.debug("Subroutine (sell) {} cleared at price {}, delta {}, margin {}".format(self.sid, p,self.opt-p, p-self.pt))
+                self.tend=t
+                self.pend=p
                 self.cleared=True
                 return
         else:
             if p-self.opt >=self.h:
-                print "Subroutine (buy) {} cleared at price {}, delta {}, margin {}".format(id, p,opt-p, p-self.pt)
+                self.tend=t
+                self.pend=p
+                logger.debug("Subroutine (buy) {} cleared at price {}, delta {}, margin {}".format(self.sid, p,self.opt-p, p-self.pt))
                 self.cleared=True
                 return
+        return
 
 
 class ThresholdTurningPoint(Strategy):
@@ -273,14 +292,24 @@ class ThresholdTurningPoint(Strategy):
         self.min=None
         self.max=None
         self.funds=funds
+        self.ofunds=funds
+        self.units=0
+        self.ts=[]
+        self.ps=[]
+        self.orders={}
+        self.routines=[]
 
     def init(self,n,h, units, nmode="fixed",hmode="abs",**kwargs):
         self.stacks=[]
         self.pt=self.inst.price
-        if self.pt*units > funds:
-            raise ValueError("Not enough funds!")
+        if self.pt*units > self.funds:
+            logger.warn("Not enough funds, buying all!")
+            units=int(self.funds/self.pt)
         self.funds -= units*self.pt
+        self.funds_series=[]
         self.units = units
+        self.units_series=[]
+        self.gains_series=[]
         self.n=n
         self.h=h
         self.hmode=hmode
@@ -292,62 +321,81 @@ class ThresholdTurningPoint(Strategy):
         return
 
     def placeUnits(self, u,p,thr1=0, thr2=0, direction=1):
+        logger.debug("Placing unit {}@price {} with funds {}".format(u,p,self.funds))
         if direction: #long
-            if (self.units - u)*p+funds<thr1:
-                print "Running out of funds!"
+            if (self.units - u)*p+self.funds<thr1:
+                logger.warning("Running out of funds!")
+                raise ValueError()
                 return False
             else:
                 self.units -= u
+                self.funds+=u*p
                 return True
         else:
-            if funds-u*p < thr2:
-                print "Running out of funds!"
+            if self.funds-u*p < thr2:
+                logger.warning("Running out of funds!")
+                raise ValueError()
                 return False
             else:
                 self.units += u
+                self.funds -= u*p
                 return True
         return False
 
     def update(self,**kwargs):
         def clearStacks(stacks):
             for s2 in self.stacks:
-                s2.update(p_cur)
+                s2.update(p_cur,self.inst.ts)
                 if s2.cleared:
-                    print "{} cleared at price {}".format(s2.id, p_cur)
                     n=self.n #may change
-                    if self.placeUnits(n):
-                        if s2.direction:
+                    if self.placeUnits(n,p_cur):
+                        if s2.direction==1:
                             self.inst.orderSell(n)
+                            self.orders[s2.sid]=(1, s2.t, s2.opt, self.inst.ts, p_cur)
                         else:
                             self.inst.orderBuy(n)
+                            self.orders[s2.sid]=(-1, s2.t, s2.opt, self.inst.ts, p_cur)
+                        self.pt=p_cur
                     else:
-                        print "Failed to place order for {} at price {} for unit {}".format(s2.id, p_cur, n)
+                        logger.info("Failed to place order for {} at price {} for unit {}".format(s2.sid, p_cur, n))
                 elif s2.terminated:
-                    print "{} terminated at price {}".format(s2.id, p_cur)
+                    logger.debug("{} terminated at price {}".format(s2.sid, p_cur))
                 else:
-                    stacks.append(s)
+                    stacks.append(s2)
             return stacks
         stacks = []
         p_old=self.inst.price
-        self.inst.update()
+        self.ts.append(self.inst.ts)
+        self.ps.append(self.inst.price)
+        if self.sim:
+            t=kwargs.get("t")
+            p=kwargs.get("p")
+            self.inst.update(t,p)
+        else:
+            self.inst.update()
         p_cur=self.inst.price
         if p_cur==p_old:
-            print "No change..."
+            logger.debug("No change...")
             return
         stacks=clearStacks(stacks)
         if p_cur>p_old:
-            direction = 1
+            direction = 3
         else:
             direction = -1
         if self.direction != direction:
             self.direction=direction
             if p_cur>p_old:
-                s = ThresholdTurningPointSubroutine(cnt, p_old, self.pt, self.h, -1)
+                s = ThresholdTurningPointSubroutine(self.cnt, p_old, self.pt, self.h,self.inst.ts, -1)
             else:
-                s = ThresholdTurningPointSubroutine(cnt, p_old, self.pt, self.h, 1)
-            s.update(p_cur)
+                s = ThresholdTurningPointSubroutine(self.cnt, p_old, self.pt, self.h,self.inst.ts ,1)
+            self.routines.append(s)
+            s.update(p_cur,self.inst.ts)
             stacks.append(s)
         self.stacks =stacks
+        self.funds_series.append(self.funds)
+        self.units_series.append(self.units)
+        self.gains_series.append(self.funds+self.units*p-self.ofunds)
+        self.cnt+=1
         return
     def clearOrders(self,**kwargs):
         #need to clear order and recalculate unit/funds here
@@ -358,7 +406,7 @@ if __name__ == "__main__":
     print CONN.action("/api/user/accounts")
     print CONN.action("/api/user")
     print CONN.action("/api/portfolio?portfolioID=23")
-    # print CONN.action("/api/portfolio/position?portfolioID=23")
+    # logger. CONN.action("/api/portfolio/position?portfolioID=23")
     INST=SimulatedInstrument("Apple","APPL","stock")
     for inst in GetAllInstruments(None):
         inst.update()
