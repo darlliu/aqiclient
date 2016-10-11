@@ -43,12 +43,13 @@ def Data():
     data["cols"]=[
             {"id":"","label":"Time","pattern":"","type":"datetime"},
             {"id":"","label":"Funds","pattern":"","type":"number"},
+            {"id":"","label":"Units","pattern":"","type":"number"},
             {"id":"","label":"Gains","pattern":"","type":"number"},
             ]
     data["rows"]=[]
     for t,p1,p2,p3 in zip(S.ts, S.funds_series,S.units_series, S.gains_series):
         d="Date({},{},{},{})".format(t.year,t.month,t.day,t.hour)
-        data["rows"].append({"c":[{"v":d, "f":None},{"v":p1,"f":None},{"v":p3,"f":None}]})
+        data["rows"].append({"c":[{"v":d, "f":None},{"v":p1,"f":None},{"v":p2,"f":None},{"v":p3,"f":None}]})
     output["chart2"]=data
 
     data={}
@@ -71,7 +72,7 @@ def Data():
             status="Terminated"
         else:
             status="Running"
-        if s.direction==1:
+        if s.direction==-1:
             direction="Selling"
         else:
             direction="Buying"
