@@ -1,0 +1,230 @@
+
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8">
+        <meta http-equiv="X-UA-Compatible" content="IE=edge">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="description" content="">
+        <meta name="author" content="">
+        <link rel="icon" href="../../favicon.ico">
+
+        <title>AqiClient Simulator</title>
+
+        <!-- Bootstrap core CSS -->
+        <link href="/static/bootstrap/css/bootstrap.min.css" rel="stylesheet">
+        <script src="http://d3js.org/d3.v3.js"></script>
+        <link href="/static/dashboard.css" rel="stylesheet">
+
+        <!-- Just for debugging purposes. Don't actually copy these 2 lines! -->
+        <!--[if lt IE 9]><script src="../../assets/js/ie8-responsive-file-warning.js"></script><![endif]-->
+        <!--Check on this later-->
+        <!--     // <script src="/static/js/ie-emulation-modes-warning.js"></script> -->
+
+        <!-- HTML5 shim and Respond.js for IE8 support of HTML5 elements and media queries -->
+        <!--[if lt IE 9]>
+            <script src="https://oss.maxcdn.com/html5shiv/3.7.2/html5shiv.min.js"></script>
+            <script src="https://oss.maxcdn.com/respond/1.4.2/respond.min.js"></script>
+        <![endif]-->
+    </head>
+
+    <body>
+        <div class="container-fluid">
+            <div class="row">
+                <div class="col-md-2">
+                    <form id="params">
+                        <div class="row">
+                            <h5>选历史股票</h5>
+                            <div class="form-group">
+                                <label> 股票</label>
+                                <select name="stock">
+                                    <option value="apple">Apple(Historical)</option>
+                                    <option value="twitter">Twitter(Historical)</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="row">
+                            <h5>基本</h5>
+                            <div class="form-group">
+
+                                <label >起始年:</label>
+                                <input type="number" name="start_year" id="param_year_start" placeholder="Increment of buy/sell amounts" value=2014>
+                            </div>
+                            <div class="form-group">
+
+                                <label>结束年</label>
+                                <input type="number" name="end_year" id="param_year_end" placeholder="Increment of buy/sell amounts" value=2016>
+                            </div>
+                            <div class="form-group">
+
+                                <label>起始资金:</label>
+                                <input type="number" name="param_funds" id="param_funds" placeholder="Initial funds" value=100000>
+                            </div>
+                            <div class="form-group">
+
+                                <label>起始持股</label>
+                                <input type="number" name="param_units" id="param_units" placeholder="Initial holding of stock units" value=400>
+
+                            </div>
+                        </div>
+                        <div class="row">
+                            <h5>止损</h5>
+                            <div class="form-group">
+                                <label>升幅</label>
+                                <input type="number" name="winningPer" value=0.4>
+                            </div>
+
+                            <div class="form-group">
+                                <label>跌幅</label>
+                                <input type="number" name="losingPer" value=0.2>
+                            </div>
+
+                            <div class="form-group">
+                                <label>升时卖</label>
+                                <input type="number" name="sellingPerWin" value=0.5>
+                            </div>
+                            <div class="form-group">
+                                <label>跌时卖</label>
+                                <input type="number" name="sellingPerLose" value=0.6>
+                            </div>
+                        </div>
+                        <div class="row">
+                            <h5>追踪</h5>
+                            <div class="form-group">
+                                <label>看走势</label>
+                                <select name="direction">
+                                    <option value="1">升</option>
+                                    <option value="-1">跌</option>
+                                </select>
+                            </div>
+
+                            <div class="form-group">
+                                <label>价格距离</label>
+                                <input type="number" name="priceGap" value=3.0>
+                            </div>
+
+                            <div class="form-group">
+                                <label>起买</label>
+                                <input type="number" name="buyInit" value=0.7>
+                            </div>
+                            <div class="form-group">
+                                <label>买递减</label>
+                                <input type="number" name="buyDelta" value=0.1>
+                            </div>
+                            <div class="form-group">
+                                <label>抛回</label>
+                                <input type="number" name="buyRetain" value=0.6>
+                            </div>
+                            <div class="form-group">
+                                <label>抛回递减</label>
+                                <input type="number" name="buyRetainDelta" value=0.1>
+                            </div>
+                            <div class="form-group">
+                                <label>起卖</label>
+                                <input type="number" name="sellInit" value=0.7>
+                            </div>
+                            <div class="form-group">
+                                <label>卖递减</label>
+                                <input type="number" name="sellDelta" value=0.1>
+                            </div>
+                            <div class="form-group">
+                                <label>持回</label>
+                                <input type="number" name="sellRetain" value=0.6>
+                            </div>
+                            <div class="form-group">
+                                <label>持回递减</label>
+                                <input type="number" name="sellRetainDelta" value=0.1>
+                            </div>
+                        </div>
+                        <div class="row">
+                            <h5>震荡</h5>
+                            <div class="form-group">
+                                <label>模式</label>
+                                <select name="mode">
+                                    <option value="increase">增持</option>
+                                    <option value="decrease">减持</option>
+                                    <option value="size">做大</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label>起手</label>
+                                <input type="number" name="n" value=10>
+                            </div>
+                            <div class="form-group">
+                                <label>递增</label>
+                                <input type="number" name="n_delta" value=1>
+                            </div>
+                            <div class="form-group">
+                                <label>阈值</label>
+                                <input type="float" name="h" value=1.0>
+                            </div>
+
+                        </div>
+
+                        <div class="row">
+                            <div class="form-group">
+                                <button type="button" class="btn btn-submit"><input type="submit" value="Run simulation"></button>
+                            </div>
+                    </form>
+                        </div>
+                </div>
+            <div class="col-md-8">
+                <div class="container-fluid">
+                    <div class="row-fluid" id="chart_div">
+                    </div>
+
+                    <div class="row-fluid" id="chart_div2">
+                    </div>
+
+                    <div class="row-fluid" id="chart_diff_div">
+                    </div>
+
+                    <div class="row-fluid" id="table_div">
+                    </div>
+                </div>
+            </div>
+        </div>
+        </div><!-- /.container -->
+
+
+        <!-- Bootstrap core JavaScript
+            ================================================== -->
+            <!-- Placed at the end of the document so the pages load faster -->
+            <script type="text/javascript" src="https://www.gstatic.com/charts/loader.js"></script>
+            <script src="http://code.jquery.com/jquery-latest.min.js"></script>
+            <script src="/static/bootstrap/js/bootstrap.min.js"></script>
+            <!-- IE10 viewport hack for Surface/desktop Windows 8 bug -->
+            <!--     // <script src="/static/assets/js/ie10-viewport-bug-workaround.js"></script> -->
+            <script>
+// Load the Visualization API and the piechart package.
+google.charts.load('current', {'packages':['corechart','table']});
+// Set a callback to run when the Google Visualization API is loaded.
+function drawChart(e) {
+    var jsonData = $.ajax({
+        type: "POST",
+        dataType:'json',
+        async:false,
+        url: "/data",
+        data: $(this).serialize(),
+    }).responseText;
+    jsonData=JSON.parse(jsonData);
+    e.preventDefault();
+    // Create our data table out of JSON data loaded from server.
+    var data = new google.visualization.DataTable(jsonData["chart"]);
+    // Instantiate and draw our chart, passing in some options.
+    var chart = new google.visualization.LineChart(document.getElementById('chart_div'));
+    chart.draw(data,{"height":1200,"width":1800});
+
+    var data2 = new google.visualization.DataTable(jsonData["chart2"]);
+    // Instantiate and draw our chart, passing in some options.
+    var chart2 = new google.visualization.LineChart(document.getElementById('chart_div2'));
+    chart2.draw(data2,{"height":1200,"width":1800});
+    var data3 = new google.visualization.DataTable(jsonData["table"]);
+    var table = new google.visualization.Table(document.getElementById('table_div'));
+    table.draw(data3);
+}
+$("#params").on("submit",drawChart);
+            </script>
+
+    </body>
+</html>
